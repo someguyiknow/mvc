@@ -1,0 +1,19 @@
+#!/bin/bash
+
+#type="11" #renewal
+#type="12" #realid
+type="15" #permits
+#type="16" #non-driver
+email="<your_email_here>"
+url="https://telegov.njportal.com/njmvc/AppointmentWizard/$type"
+lookups=$(curl -s $url|grep LocAppointments|head -n 1|grep -oP 'Name.{45}|LocationId.{5}'|uniq|cut -f 2 -d :|cut -f 1 -d -|tr '\n' ','|sed 's/ ,/,/g'|sed 's/,"/\\n/g'|sed 's/"//g')
+curl -s -o /dev/null -b cookiejar -c cookiejar $url
+while true; do
+   for loc in $(curl -s $url|grep LocAppointments|head -n 1|grep -oP 'LocationId.{5}'|uniq|cut -f 2 -d :); do
+    sleep 2
+    appt=$(curl -s "https://telegov.njportal.com/njmvc/CustomerCreateAppointments/GetNextAvailableDate?appointmentTypeId=$type&locationId=$loc" -H 'authority: telegov.njportal.com' -H 'sec-ch-ua: " Not A;Brand";v="99", "Chromium";v="90", "Google Chrome";v="90"' -H 'accept: */*' -H 'dnt: 1' -H 'x-requested-with: XMLHttpRequest' -H 'sec-ch-ua-mobile: ?0' -H 'user-agent: Mozilla/5.0 (X11; CrOS x86_64 13816.34.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.51 Safari/537.36' -H 'sec-fetch-site: same-origin' -H 'sec-fetch-mode: cors' -H 'sec-fetch-dest: empty' -H 'referer: https://telegov.njportal.com/njmvc/AppointmentWizard/$type' -H 'accept-language: en-US,en;q=0.9')
+    if [[ $(echo $appt|grep "No Appointments Available"|wc -l) -ne 1 ]]; then
+      echo -e "New appointments available at $(echo -e $lookups|grep $loc|cut -f 1 -d ,) at $(echo $appt|cut -f 3,4 -d :|cut -f 1 -d \").\n$url/$loc"|mail -s "DMV Appointments Available" $email
+    fi
+  done
+done
